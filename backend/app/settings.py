@@ -11,5 +11,9 @@ class Settings(BaseModel):
     chunk_size: int = int(os.getenv("CHUNK_SIZE", "700"))
     chunk_overlap: int = int(os.getenv("CHUNK_OVERLAP", "80"))
     data_dir: str = os.getenv("DATA_DIR", "/app/data")
+    mask_pii: bool = os.getenv("MASK_PII", "true").lower() in ("1","true","yes")
+    # CORS settings
+    allowed_origins: str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001")
+    environment: str = os.getenv("ENVIRONMENT", "development")
 
 settings = Settings()

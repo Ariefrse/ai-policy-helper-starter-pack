@@ -1,4 +1,4 @@
-.PHONY: dev test fmt
+.PHONY: dev test fmt lint docker-build
 dev:
 	docker compose up --build
 
@@ -7,3 +7,9 @@ test:
 
 fmt:
 	docker compose run --rm backend black app
+
+lint:
+	docker compose run --rm backend ruff check app && docker compose run --rm backend flake8 app
+
+docker-build:
+	docker build -t policy-helper-backend ./backend && docker build -t policy-helper-frontend ./frontend

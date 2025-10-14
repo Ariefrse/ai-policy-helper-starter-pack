@@ -19,15 +19,45 @@ def _md_sections(text: str) -> List[Tuple[str, str]]:
         out.append((title, p))
     return out or [("Body", text)]
 
+def _sentences(s: str) -> List[str]:
+    # naive sentence splitter that keeps headings and paragraphs intact
+    # split on blank lines first, then within paragraphs by punctuation
+    paras = re.split(r"\n{2,}", s.strip())
+    out: List[str] = []
+    for p in paras:
+        p = p.strip()
+        if not p:
+            continue
+        if p.startswith("#"):  # keep headings as their own sentence
+            out.append(p)
+            continue
+        # split by sentence enders but keep delimiter
+        parts = re.split(r"(?<=[\.!?])\s+", p)
+        out.extend([x for x in parts if x])
+    return out
+
 def chunk_text(text: str, chunk_size: int, overlap: int) -> List[str]:
-    tokens = text.split()
-    chunks = []
-    i = 0
-    while i < len(tokens):
-        chunk = tokens[i:i+chunk_size]
-        chunks.append(" ".join(chunk))
-        if i + chunk_size >= len(tokens): break
-        i += chunk_size - overlap
+    # sentence-aware packing up to ~chunk_size tokens, overlapping tail tokens
+    sents = _sentences(text)
+    chunks: List[str] = []
+    cur: List[str] = []
+    cur_tokens = 0
+    for s in sents:
+        ts = s.split()
+        tlen = len(ts)
+        if cur_tokens + tlen > chunk_size and cur:
+            chunks.append(" ".join(cur))
+            # build overlap tail
+            if overlap > 0:
+                tail = (" ".join(cur)).split()[-overlap:]
+                cur = [" ".join(tail)] if tail else []
+                cur_tokens = len(tail)
+            else:
+                cur, cur_tokens = [], 0
+        cur.append(s)
+        cur_tokens += tlen
+    if cur:
+        chunks.append(" ".join(cur))
     return chunks
 
 def load_documents(data_dir: str) -> List[Dict]:

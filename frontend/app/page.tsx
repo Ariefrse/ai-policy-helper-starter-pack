@@ -13,7 +13,7 @@ export default function Page() {
         <ol>
           <li>Click <b>Ingest sample docs</b>.</li>
           <li>Ask: <i>Can a customer return a damaged blender after 20 days?</i></li>
-          <li>Ask: <i>What’s the shipping SLA to East Malaysia for bulky items?</i></li>
+          <li>Ask: <i>What's the shipping SLA to East Malaysia for bulky items?</i></li>
         </ol>
       </div>
     </div>

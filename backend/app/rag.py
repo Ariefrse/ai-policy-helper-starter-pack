@@ -160,6 +160,8 @@ class Metrics:
     def __init__(self):
         self.t_retrieval = []
         self.t_generation = []
+        self.total_asks = 0
+        self.total_ingests = 0
 
     def add_retrieval(self, ms: float):
         self.t_retrieval.append(ms)
@@ -168,11 +170,20 @@ class Metrics:
         self.t_generation.append(ms)
 
     def summary(self) -> Dict:
-        avg_r = sum(self.t_retrieval)/len(self.t_retrieval) if self.t_retrieval else 0.0
-        avg_g = sum(self.t_generation)/len(self.t_generation) if self.t_generation else 0.0
+        import numpy as _np
+        arr_r = _np.array(self.t_retrieval, dtype=float) if self.t_retrieval else _np.array([])
+        arr_g = _np.array(self.t_generation, dtype=float) if self.t_generation else _np.array([])
+        avg_r = float(arr_r.mean()) if arr_r.size else 0.0
+        avg_g = float(arr_g.mean()) if arr_g.size else 0.0
+        p95_r = float(_np.percentile(arr_r, 95)) if arr_r.size else 0.0
+        p95_g = float(_np.percentile(arr_g, 95)) if arr_g.size else 0.0
         return {
             "avg_retrieval_latency_ms": round(avg_r, 2),
             "avg_generation_latency_ms": round(avg_g, 2),
+            "p95_retrieval_latency_ms": round(p95_r, 2),
+            "p95_generation_latency_ms": round(p95_g, 2),
+            "total_asks": int(self.total_asks),
+            "total_ingests": int(self.total_ingests),
         }
 
 class RAGEngine:
@@ -225,6 +236,7 @@ class RAGEngine:
             self._chunk_count += 1
 
         self.store.upsert(vectors, metas)
+        self.metrics.total_ingests += 1
         return (len(self._doc_titles) - len(doc_titles_before), len(metas))
 
     def retrieve(self, query: str, k: int = 4) -> List[Dict]:
@@ -238,6 +250,7 @@ class RAGEngine:
         t0 = time.time()
         answer = self.llm.generate(query, contexts)
         self.metrics.add_generation((time.time()-t0)*1000.0)
+        self.metrics.total_asks += 1
         return answer
 
     def stats(self) -> Dict:

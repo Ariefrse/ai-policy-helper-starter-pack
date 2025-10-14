@@ -1,0 +1,15 @@
+[tool.black]
+line-length = 100
+target-version = ["py311"]
+include = ".*\.py$"
+exclude = ["/\.venv/", "/node_modules/"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["backend/app"]
+
+[tool.ruff.lint]
+select = ["E","F","I","W"]
+ignore = []
+

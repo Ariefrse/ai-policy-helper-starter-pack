@@ -42,9 +42,9 @@ app.add_middleware(
 engine = RAGEngine()
 
 # Security setup for protected endpoints
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
-async def verify_monitoring_key(credentials: Optional[HTTPAuthorizationCredentials] = Security(security, auto_error=False)):
+async def verify_monitoring_key(credentials: Optional[HTTPAuthorizationCredentials] = Security(security)):
     """Verify monitoring API key for access to protected endpoints."""
     if settings.monitoring_api_key is None:
         # If no monitoring key is configured, allow access in development only

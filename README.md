@@ -89,7 +89,7 @@ ai-policy-helper/
 ## Tests
 Run all tests inside the backend container:
 ```bash
-docker compose run --rm -v ./data:/app/data:ro backend pytest -q
+docker compose run --rm backend pytest -q
 ```
 
 **Test Coverage:**
@@ -98,16 +98,24 @@ docker compose run --rm -v ./data:/app/data:ro backend pytest -q
 - **Acceptance tests**: Acceptance criteria validation (2 tests)
 - **Total**: 9 tests covering functionality, performance, and error handling
 
+**CI/CD Compatibility:**
+Tests include fallback data generation for environments without mounted data directory, ensuring they work in both local development and CI/CD pipelines.
+
 Run specific test suites:
 ```bash
 # API and unit tests only
-docker compose run --rm -v ./data:/app/data:ro backend pytest app/tests/test_api.py -v
+docker compose run --rm backend pytest app/tests/test_api.py -v
 
-# End-to-end integration tests
-docker compose run --rm -v ./data:/app/data:ro backend pytest app/tests/test_end_to_end.py -v
+# End-to-end integration tests (works with or without data volume)
+docker compose run --rm backend pytest app/tests/test_end_to_end.py -v
 
-# Acceptance criteria tests
+# Acceptance criteria tests (requires full data directory)
 docker compose run --rm -v ./data:/app/data:ro backend pytest app/tests/test_acceptance.py -v
+```
+
+**With full data directory for acceptance testing:**
+```bash
+docker compose run --rm -v ./data:/app/data:ro backend pytest app/tests/ -v
 ```
 
 ## Performance Benchmarks

@@ -89,21 +89,25 @@ ai-policy-helper/
 ## Tests
 Run all tests inside the backend container:
 ```bash
-docker compose run --rm backend pytest -q
+docker compose run --rm -v ./data:/app/data:ro backend pytest -q
 ```
 
 **Test Coverage:**
-- **Unit tests**: API endpoints, models validation (4 tests)
+- **Unit tests**: API endpoints, models validation (3 tests)
 - **Integration tests**: End-to-end RAG pipeline, citation accuracy, performance benchmarks (4 tests)
-- **Total**: 8 tests covering functionality, performance, and error handling
+- **Acceptance tests**: Acceptance criteria validation (2 tests)
+- **Total**: 9 tests covering functionality, performance, and error handling
 
 Run specific test suites:
 ```bash
 # API and unit tests only
-docker compose run --rm backend pytest app/tests/test_api.py -v
+docker compose run --rm -v ./data:/app/data:ro backend pytest app/tests/test_api.py -v
 
 # End-to-end integration tests
-docker compose run --rm backend pytest app/tests/test_end_to_end.py -v
+docker compose run --rm -v ./data:/app/data:ro backend pytest app/tests/test_end_to_end.py -v
+
+# Acceptance criteria tests
+docker compose run --rm -v ./data:/app/data:ro backend pytest app/tests/test_acceptance.py -v
 ```
 
 ## Performance Benchmarks

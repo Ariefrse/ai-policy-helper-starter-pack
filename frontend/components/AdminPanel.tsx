@@ -1,10 +1,13 @@
 'use client';
 import React from 'react';
 import { apiIngest, apiMetrics } from '../lib/api';
+import type { MetricsData } from '../lib/types';
+import styles from './AdminPanel.module.css';
 
 export default function AdminPanel() {
-  const [metrics, setMetrics] = React.useState<any>(null);
+  const [metrics, setMetrics] = React.useState<MetricsData | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [successMessage, setSuccessMessage] = React.useState<string>('');
 
   const refresh = async () => {
     const m = await apiMetrics();
@@ -13,9 +16,16 @@ export default function AdminPanel() {
 
   const ingest = async () => {
     setBusy(true);
+    setSuccessMessage('');
     try {
-      await apiIngest();
+      const result = await apiIngest();
       await refresh();
+      setSuccessMessage(`✅ Successfully ingested ${result.indexed_docs} documents (${result.indexed_chunks} chunks)`);
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setSuccessMessage(`❌ Error: ${errorMessage}`);
+      setTimeout(() => setSuccessMessage(''), 5000);
     } finally {
       setBusy(false);
     }
@@ -24,16 +34,21 @@ export default function AdminPanel() {
   React.useEffect(() => { refresh(); }, []);
 
   return (
-    <div className="card">
+    <div className={`card ${styles.adminContainer}`}>
       <h2>Admin</h2>
-      <div style={{display:'flex', gap:8, marginBottom:8}}>
-        <button onClick={ingest} disabled={busy} style={{padding:'8px 12px', borderRadius:8, border:'1px solid #111', background:'#fff'}}>
+      <div className={styles.buttonContainer}>
+        <button onClick={ingest} disabled={busy} className={styles.adminButton}>
           {busy ? 'Indexing...' : 'Ingest sample docs'}
         </button>
-        <button onClick={refresh} style={{padding:'8px 12px', borderRadius:8, border:'1px solid #111', background:'#fff'}}>Refresh metrics</button>
+        <button onClick={refresh} className={styles.adminButton}>Refresh metrics</button>
       </div>
+      {successMessage && (
+        <div className={`${styles.successMessage} ${successMessage.includes('✅') ? styles.successMessageSuccess : styles.successMessageError}`}>
+          {successMessage}
+        </div>
+      )}
       {metrics && (
-        <div className="code">
+        <div className={`code ${styles.metricsContainer}`}>
           <pre>{JSON.stringify(metrics, null, 2)}</pre>
         </div>
       )}

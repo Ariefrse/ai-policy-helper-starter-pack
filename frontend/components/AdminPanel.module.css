@@ -1,0 +1,48 @@
+/* AdminPanel component styles */
+.adminContainer {
+  /* Main container uses existing .card class */
+}
+
+.buttonContainer {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.adminButton {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #111;
+  background: #fff;
+  cursor: pointer;
+}
+
+.adminButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.successMessage {
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid;
+}
+
+.successMessageSuccess {
+  background-color: #d1fae5;
+  color: #065f46;
+  border-color: #10b981;
+}
+
+.successMessageError {
+  background-color: #fee2e2;
+  color: #991b1b;
+  border-color: #ef4444;
+}
+
+.metricsContainer {
+  /* Uses existing .code class */
+}

@@ -1,64 +1,177 @@
 'use client';
 import React from 'react';
 import { apiAsk } from '../lib/api';
+import { Message } from '../lib/types';
+import styles from './Chat.module.css';
 
-type Message = { role: 'user' | 'assistant', content: string, citations?: {title:string, section?:string}[], chunks?: {title:string, section?:string, text:string}[] };
+interface MessageItemProps {
+  message: Message;
+  index: number;
+}
+
+const MessageItem = React.memo(({ message, index }: MessageItemProps) => {
+  const citationsArray = React.useMemo(() => message.citations || [], [message.citations]);
+  const chunksArray = React.useMemo(() => message.chunks || [], [message.chunks]);
+
+  return (
+    <div key={index} className={styles.messageContainer}>
+      <div className={styles.messageHeader}>
+        <div className={`${styles.avatar} ${message.role === 'user' ? styles.avatarUser : styles.avatarAssistant}`}>
+          {message.role === 'user' ? '👤' : '🤖'}
+        </div>
+        <div className={styles.messageContent}>
+          <div className={styles.messageRole}>
+            {message.role === 'user' ? 'You' : 'AI Assistant'}
+          </div>
+          <div className={`${styles.messageBubble} ${message.role === 'user' ? styles.messageBubbleUser : styles.messageBubbleAssistant}`}>
+            {message.content}
+          </div>
+        </div>
+      </div>
+
+      {citationsArray.length > 0 && (
+        <div className={styles.citationsContainer}>
+          <div className={styles.citationsHeader}>
+            📚 Sources ({citationsArray.length})
+          </div>
+          <div className={styles.citationsList}>
+            {citationsArray.map((c, idx) => (
+              <span
+                key={`${c.title}-${c.section}-${idx}`}
+                className="badge"
+                title={c.section ? `${c.title} - ${c.section}` : c.title}
+              >
+                📄 {c.title}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {chunksArray.length > 0 && (
+        <div className={styles.chunksContainer}>
+          <details className={styles.chunkDetails}>
+            <summary className={styles.chunkSummary}>
+              🔍 View supporting sources ({chunksArray.length} chunks)
+            </summary>
+            <div className={styles.chunkContent}>
+              {chunksArray.map((c, idx) => (
+                <div key={`${c.title}-${c.section}-${idx}`} className={idx < chunksArray.length - 1 ? styles.chunkItem : `${styles.chunkItem} ${styles.chunkItemLastChild}`}>
+                  <div className={styles.chunkTitle}>
+                    📋 {c.title}
+                    {c.section && (
+                      <span className={styles.chunkSection}>
+                        → {c.section}
+                      </span>
+                    )}
+                  </div>
+                  <div className={styles.chunkText}>
+                    {c.text}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
+        </div>
+      )}
+    </div>
+  );
+});
+
+MessageItem.displayName = 'MessageItem';
 
 export default function Chat() {
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [q, setQ] = React.useState('');
   const [loading, setLoading] = React.useState(false);
 
-  const send = async () => {
+  const send = React.useCallback(async () => {
     if (!q.trim()) return;
-    const my = { role: 'user' as const, content: q };
+    const my: Message = {
+      id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      role: 'user' as const,
+      content: q
+    };
     setMessages(m => [...m, my]);
     setLoading(true);
     try {
       const res = await apiAsk(q);
-      const ai: Message = { role: 'assistant', content: res.answer, citations: res.citations, chunks: res.chunks };
+      const ai: Message = {
+        id: `assistant-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        role: 'assistant',
+        content: res.answer,
+        citations: res.citations,
+        chunks: res.chunks
+      };
       setMessages(m => [...m, ai]);
-    } catch (e:any) {
-      setMessages(m => [...m, { role: 'assistant', content: 'Error: ' + e.message }]);
+    } catch (e: unknown) {
+      const errorMessage = e instanceof Error ? e.message : 'Unknown error occurred';
+      setMessages(m => [...m, {
+        id: `error-${Date.now()}`,
+        role: 'assistant',
+        content: 'Error: ' + errorMessage
+      }]);
     } finally {
       setLoading(false);
       setQ('');
     }
-  };
+  }, [q]);
+
+  const handleInputChange = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setQ(e.target.value);
+  }, []);
+
+  const handleKeyDown = React.useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      send();
+    }
+  }, [send]);
+
+  const messagesList = React.useMemo(() =>
+    messages.map((message, index) => (
+      <MessageItem
+        key={`${message.role}-${index}-${message.content.slice(0, 20)}`}
+        message={message}
+        index={index}
+      />
+    )), [messages]
+  );
 
   return (
-    <div className="card">
-      <h2>Chat</h2>
-      <div style={{maxHeight: 320, overflowY:'auto', padding: 8, border:'1px solid #eee', borderRadius: 8, marginBottom: 12}}>
-        {messages.map((m, i) => (
-          <div key={i} style={{margin: '8px 0'}}>
-            <div style={{fontSize:12, color:'#666'}}>{m.role === 'user' ? 'You' : 'Assistant'}</div>
-            <div>{m.content}</div>
-            {m.citations && m.citations.length>0 && (
-              <div style={{marginTop:6}}>
-                {m.citations.map((c, idx) => (
-                  <span key={idx} className="badge" title={c.section || ''}>{c.title}</span>
-                ))}
-              </div>
-            )}
-            {m.chunks && m.chunks.length>0 && (
-              <details style={{marginTop:6}}>
-                <summary>View supporting chunks</summary>
-                {m.chunks.map((c, idx) => (
-                  <div key={idx} className="card">
-                    <div style={{fontWeight:600}}>{c.title}{c.section ? ' — ' + c.section : ''}</div>
-                    <div style={{whiteSpace:'pre-wrap'}}>{c.text}</div>
-                  </div>
-                ))}
-              </details>
-            )}
-          </div>
-        ))}
+    <div className={`card ${styles.chatContainer}`}>
+      <div className={styles.header}>
+        <h2 className={styles.title}>💬 Policy Assistant</h2>
+        {loading && (
+          <div className={styles.loadingIndicator}>Thinking...</div>
+        )}
       </div>
-      <div style={{display:'flex', gap:8}}>
-        <input placeholder="Ask about policy or products..." value={q} onChange={e=>setQ(e.target.value)} style={{flex:1, padding:10, borderRadius:8, border:'1px solid #ddd'}} onKeyDown={(e)=>{ if(e.key==='Enter') send(); }}/>
-        <button onClick={send} disabled={loading} style={{padding:'10px 14px', borderRadius:8, border:'1px solid #111', background:'#111', color:'#fff'}}>
-          {loading ? 'Thinking...' : 'Send'}
+
+      <div className={styles.messagesContainer}>
+        {messages.length === 0 ? (
+          <div className={styles.emptyState}>
+            <div className={styles.emptyStateIcon}>🤖</div>
+            <div className={styles.emptyStateTitle}>Ask about shipping, returns, warranties, or product policies</div>
+            <div className={styles.emptyStateSubtitle}>I'll provide answers with source citations</div>
+          </div>
+        ) : (
+          messagesList
+        )}
+      </div>
+
+      <div className={styles.inputContainer}>
+        <input
+          placeholder="Ask about policy or products..."
+          value={q}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          className={styles.messageInput}
+        />
+        <button
+          onClick={send}
+          disabled={loading || !q.trim()}
+          className={`${styles.sendButton} ${loading || !q.trim() ? styles.sendButtonDisabled : styles.sendButtonEnabled}`}
+        >
+          {loading ? '...' : 'Send'}
         </button>
       </div>
     </div>

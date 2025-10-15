@@ -1,7 +1,5 @@
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from typing import List
 import logging
 from .models import IngestResponse, AskRequest, AskResponse, MetricsResponse, Citation, Chunk
 from .settings import settings
@@ -46,12 +44,43 @@ def health() -> dict[str, str]:
     """Health check endpoint."""
     return {"status": "ok"}
 
+@app.get("/api/service-status")
+def service_status() -> dict:
+    """Get detailed service status for monitoring."""
+    try:
+        return engine.get_service_status()
+    except Exception as e:
+        logger.error(f"Failed to retrieve service status: {e}")
+        return {
+            "services": {
+                "vector_store": {"healthy": False, "type": "unknown", "degraded": True},
+                "llm": {"healthy": False, "type": "unknown", "degraded": True}
+            },
+            "any_degraded": True,
+            "all_healthy": False,
+            "status_message": "Service status unavailable"
+        }
+
 @app.get("/api/metrics", response_model=MetricsResponse)
 def metrics() -> MetricsResponse:
     """Get system metrics including document counts and latencies."""
     try:
         s = engine.stats()
-        return MetricsResponse(**s)
+        return MetricsResponse(
+            total_docs=s["total_docs"],
+            total_chunks=s["total_chunks"],
+            avg_retrieval_latency_ms=s["avg_retrieval_latency_ms"],
+            avg_generation_latency_ms=s["avg_generation_latency_ms"],
+            p95_retrieval_latency_ms=s["p95_retrieval_latency_ms"],
+            p95_generation_latency_ms=s["p95_generation_latency_ms"],
+            total_asks=s["total_asks"],
+            total_ingests=s["total_ingests"],
+            embedding_model=s["embedding_model"],
+            llm_model=s["llm_model"],
+            vector_store=s.get("vector_store"),
+            collection_name=s.get("collection_name"),
+            service_health=s.get("service_health")
+        )
     except Exception as e:
         logger.error(f"Failed to retrieve metrics: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve metrics")
@@ -104,6 +133,12 @@ def ask(req: AskRequest) -> AskResponse:
 
         logger.info(f"Query processed successfully with {len(citations)} citations")
 
+        # Include service health information if services are degraded
+        service_health = None
+        if stats.get("service_health", {}).get("any_degraded", False):
+            service_health = stats["service_health"]
+            logger.warning(f"Returning response with degraded services: {service_health.get('status_message')}")
+
         return AskResponse(
             query=req.query,
             answer=answer,
@@ -112,8 +147,11 @@ def ask(req: AskRequest) -> AskResponse:
             metrics={
                 "retrieval_ms": stats["avg_retrieval_latency_ms"],
                 "generation_ms": stats["avg_generation_latency_ms"],
-            }
+            },
+            service_health=service_health
         )
     except Exception as e:
         logger.error(f"Query processing failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to process your question. Please try again.")
+
+

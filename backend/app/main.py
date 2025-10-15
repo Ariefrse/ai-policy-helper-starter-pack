@@ -1,6 +1,8 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Security, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import logging
+from typing import Any, Optional
 from .models import IngestResponse, AskRequest, AskResponse, MetricsResponse, Citation, Chunk
 from .settings import settings
 from .ingest import load_documents
@@ -39,31 +41,77 @@ app.add_middleware(
 
 engine = RAGEngine()
 
+# Security setup for protected endpoints
+security = HTTPBearer()
+
+async def verify_monitoring_key(credentials: Optional[HTTPAuthorizationCredentials] = Security(security, auto_error=False)):
+    """Verify monitoring API key for access to protected endpoints."""
+    if settings.monitoring_api_key is None:
+        # If no monitoring key is configured, allow access in development only
+        if settings.environment == "development":
+            return None
+        raise HTTPException(status_code=500, detail="Monitoring key not configured")
+
+    # If monitoring key is configured, require valid authentication
+    if credentials is None or credentials.credentials != settings.monitoring_api_key:
+        logger.warning("Unauthorized access attempt to protected endpoint")
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing monitoring API key",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return None
+
 @app.get("/api/health")
-def health() -> dict[str, str]:
-    """Health check endpoint."""
-    return {"status": "ok"}
+def health() -> dict[str, Any]:
+    """Basic health check for load balancers."""
+    return engine.get_public_service_status()
 
 @app.get("/api/service-status")
-def service_status() -> dict:
-    """Get detailed service status for monitoring."""
+def service_status(auth: Optional[str] = Depends(verify_monitoring_key)) -> dict[str, Any]:
+    """Get detailed service status for monitoring (authentication required)."""
     try:
         return engine.get_service_status()
-    except Exception as e:
-        logger.error(f"Failed to retrieve service status: {e}")
+    except ConnectionError as e:
+        logger.error(f"Connection error retrieving service status: {e}")
         return {
             "services": {
-                "vector_store": {"healthy": False, "type": "unknown", "degraded": True},
-                "llm": {"healthy": False, "type": "unknown", "degraded": True}
+                "vector_store": {"healthy": False, "type": "unknown", "degraded": True, "error": "connection_error"},
+                "llm": {"healthy": False, "type": "unknown", "degraded": True, "error": "connection_error"}
             },
             "any_degraded": True,
             "all_healthy": False,
-            "status_message": "Service status unavailable"
+            "status_message": "Service status unavailable due to connection errors",
+            "error_type": "connection_error"
+        }
+    except TimeoutError as e:
+        logger.error(f"Timeout error retrieving service status: {e}")
+        return {
+            "services": {
+                "vector_store": {"healthy": False, "type": "unknown", "degraded": True, "error": "timeout"},
+                "llm": {"healthy": False, "type": "unknown", "degraded": True, "error": "timeout"}
+            },
+            "any_degraded": True,
+            "all_healthy": False,
+            "status_message": "Service status unavailable due to timeout",
+            "error_type": "timeout"
+        }
+    except Exception as e:
+        logger.error(f"Unexpected error retrieving service status: {e}", exc_info=True)
+        return {
+            "services": {
+                "vector_store": {"healthy": False, "type": "unknown", "degraded": True, "error": "unexpected_error"},
+                "llm": {"healthy": False, "type": "unknown", "degraded": True, "error": "unexpected_error"}
+            },
+            "any_degraded": True,
+            "all_healthy": False,
+            "status_message": "Service status unavailable due to unexpected error",
+            "error_type": "unexpected_error"
         }
 
 @app.get("/api/metrics", response_model=MetricsResponse)
-def metrics() -> MetricsResponse:
-    """Get system metrics including document counts and latencies."""
+def metrics(auth: Optional[str] = Depends(verify_monitoring_key)) -> MetricsResponse:
+    """Get system metrics including document counts and latencies (authentication required)."""
     try:
         s = engine.stats()
         return MetricsResponse(

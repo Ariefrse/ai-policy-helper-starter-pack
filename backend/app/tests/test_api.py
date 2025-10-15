@@ -3,6 +3,29 @@ def test_health(client):
     assert r.status_code == 200
     assert r.json()["status"] == "ok"
 
+def test_service_status(client):
+    """Test service status endpoint returns expected structure."""
+    r = client.get("/api/service-status")
+    assert r.status_code == 200
+    data = r.json()
+
+    # Verify required fields exist
+    assert "services" in data
+    assert "any_degraded" in data
+    assert "all_healthy" in data
+    assert "status_message" in data
+
+    # Verify services structure
+    services = data["services"]
+    assert "vector_store" in services
+    assert "llm" in services
+
+    # Verify each service has required fields
+    for service_name, service_data in services.items():
+        assert "healthy" in service_data
+        assert "type" in service_data
+        assert "degraded" in service_data
+
 def test_ingest_and_ask(client):
     r = client.post("/api/ingest")
     assert r.status_code == 200

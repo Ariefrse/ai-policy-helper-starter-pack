@@ -130,7 +130,7 @@ export default function Chat() {
   const messagesList = React.useMemo(() =>
     messages.map((message, index) => (
       <MessageItem
-        key={`${message.role}-${index}-${message.content.slice(0, 20)}`}
+        key={message.id || `${message.role}-${index}`}
         message={message}
         index={index}
       />

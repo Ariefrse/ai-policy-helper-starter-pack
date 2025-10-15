@@ -1,7 +1,7 @@
 import time
 import logging
 from collections import deque
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any
 import numpy as np
 
 from .embeddings import LocalEmbedder
@@ -36,7 +36,7 @@ class Metrics:
         self.total_ingests = 0
         logger.debug(f"Initialized Metrics with buffer size {buffer_size}")
 
-    def add_retrieval(self, ms: float):
+    def add_retrieval(self, ms: float) -> None:
         """
         Add a retrieval latency measurement.
 
@@ -45,7 +45,7 @@ class Metrics:
         """
         self.t_retrieval.append(ms)
 
-    def add_generation(self, ms: float):
+    def add_generation(self, ms: float) -> None:
         """
         Add a generation latency measurement.
 
@@ -54,7 +54,7 @@ class Metrics:
         """
         self.t_generation.append(ms)
 
-    def summary(self) -> Dict:
+    def summary(self) -> Dict[str, Any]:
         """
         Generate a summary of collected metrics.
 
@@ -105,7 +105,7 @@ class RAGEngine:
         }
 
         # Initialize embedder with dependency injection
-        self.embedder = embedder or LocalEmbedder(dim=384)
+        self.embedder = embedder or LocalEmbedder(dim=settings.default_embedding_dim)
 
         # Initialize vector store with dependency injection and error handling
         self._initialize_vector_store(vector_store)
@@ -114,7 +114,7 @@ class RAGEngine:
         self._initialize_llm_provider(llm_provider)
 
         # Initialize metrics and tracking
-        self.metrics = Metrics()
+        self.metrics = Metrics(buffer_size=settings.metrics_buffer_size)
         self._doc_titles = set()
         self._chunk_count = 0
 
@@ -132,12 +132,12 @@ class RAGEngine:
                 self.store = create_vector_store(
                     store_type=settings.vector_store,
                     collection_name=settings.collection_name,
-                    dim=384
+                    dim=settings.default_embedding_dim
                 )
             except Exception as e:
                 logger.error(f"Critical error initializing vector store: {str(e)} - falling back to in-memory store")
                 from .vector_store import InMemoryStore
-                self.store = InMemoryStore(dim=384)
+                self.store = InMemoryStore(dim=settings.default_embedding_dim)
                 store_type = "memory"
 
         # Determine service health and type
@@ -208,13 +208,21 @@ class RAGEngine:
             logger.info("✅ All services running normally")
         logger.info("=" * 60)
 
-    def get_service_status(self) -> Dict:
+    def get_service_status(self) -> Dict[str, Any]:
         """Get current service status for user notification."""
         return {
             "services": self.service_status,
             "any_degraded": any(service['degraded'] for service in self.service_status.values()),
             "all_healthy": all(service['healthy'] for service in self.service_status.values()),
             "status_message": self._build_status_message()
+        }
+
+    def get_public_service_status(self) -> Dict[str, Any]:
+        """Get limited service status for public consumption."""
+        any_healthy = any(service['healthy'] for service in self.service_status.values())
+        return {
+            "status": "healthy" if any_healthy else "unhealthy",
+            "timestamp": int(time.time())
         }
 
     def _build_status_message(self) -> str:
@@ -238,7 +246,7 @@ class RAGEngine:
         else:
             return "All systems operational"
 
-    def ingest_chunks(self, chunks: List[Dict]) -> Tuple[int, int]:
+    def ingest_chunks(self, chunks: List[Dict[str, Any]]) -> Tuple[int, int]:
         """
         Ingest document chunks into the vector store.
 
@@ -277,7 +285,7 @@ class RAGEngine:
         logger.info(f"Ingested {new_chunks} chunks from {new_docs} new documents")
         return (new_docs, new_chunks)
 
-    def retrieve(self, query: str, k: int = 4) -> List[Dict]:
+    def retrieve(self, query: str, k: int = None) -> List[Dict[str, Any]]:
         """
         Retrieve relevant document chunks for a query.
 
@@ -290,7 +298,9 @@ class RAGEngine:
         """
         t0 = time.time()
         qv = self.embedder.embed(query)
-        results = self.store.search(qv, k=k)
+        # Use default k from settings if not provided
+        search_k = k if k is not None else settings.vector_search_k
+        results = self.store.search(qv, k=search_k)
         self.metrics.add_retrieval((time.time() - t0) * 1000.0)
 
         # Extract metadata from results
@@ -298,7 +308,7 @@ class RAGEngine:
         logger.debug(f"Retrieved {len(contexts)} contexts for query: {query[:50]}...")
         return contexts
 
-    def generate(self, query: str, contexts: List[Dict]) -> str:
+    def generate(self, query: str, contexts: List[Dict[str, Any]]) -> str:
         """
         Generate a response based on query and retrieved contexts.
 
@@ -316,7 +326,7 @@ class RAGEngine:
         logger.debug(f"Generated response in {(time.time() - t0) * 1000.0:.2f}ms")
         return answer
 
-    def ask(self, query: str, k: int = 4) -> str:
+    def ask(self, query: str, k: int = None) -> str:
         """
         Complete RAG pipeline: retrieve and generate response.
 
@@ -327,10 +337,12 @@ class RAGEngine:
         Returns:
             Generated response
         """
-        contexts = self.retrieve(query, k=k)
+        # Use default k from settings if not provided
+        search_k = k if k is not None else settings.vector_search_k
+        contexts = self.retrieve(query, k=search_k)
         return self.generate(query, contexts)
 
-    def stats(self) -> Dict:
+    def stats(self) -> Dict[str, Any]:
         """
         Get comprehensive statistics about the RAG engine.
 
@@ -356,9 +368,9 @@ class RAGEngine:
             **m
         }
 
-    def reset_metrics(self):
+    def reset_metrics(self) -> None:
         """Reset all collected metrics."""
-        self.metrics = Metrics()
+        self.metrics = Metrics(buffer_size=settings.metrics_buffer_size)
         logger.info("Reset all metrics")
 
 def create_rag_engine(**overrides) -> RAGEngine:

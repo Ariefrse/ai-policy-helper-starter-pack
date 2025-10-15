@@ -50,6 +50,7 @@ class AskResponse(BaseModel):
     citations: List[Citation]
     chunks: List[Chunk]
     metrics: Dict[str, Any]
+    service_health: Optional[Dict[str, Any]] = None
 
 class MetricsResponse(BaseModel):
     total_docs: int
@@ -62,6 +63,9 @@ class MetricsResponse(BaseModel):
     total_ingests: int
     embedding_model: str
     llm_model: str
+    vector_store: Optional[str] = None
+    collection_name: Optional[str] = None
+    service_health: Optional[Dict[str, Any]] = None
 
 class FeedbackRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=1000)

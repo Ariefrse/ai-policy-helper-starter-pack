@@ -1,8 +1,8 @@
 [tool.black]
 line-length = 100
 target-version = ["py311"]
-include = ".*\.py$"
-exclude = ["/\.venv/", "/node_modules/"]
+include = ".*\\.py$"
+exclude = ["/.venv/", "/node_modules/"]
 
 [tool.ruff]
 line-length = 100

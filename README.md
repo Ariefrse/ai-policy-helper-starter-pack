@@ -37,34 +37,53 @@ curl -X POST http://localhost:8000/api/ask -H 'Content-Type: application/json' \
 ai-policy-helper/
 ├─ backend/
 │  ├─ app/
-│  │  ├─ main.py          # FastAPI app + endpoints
-│  │  ├─ settings.py      # config/env
-│  │  ├─ rag.py           # embeddings, vector store, retrieval, generation
-│  │  ├─ models.py        # pydantic models
-│  │  ├─ ingest.py        # doc loader & chunker
+│  │  ├─ main.py                 # FastAPI app + endpoints (with deduplication & categorization)
+│  │  ├─ settings.py             # config/env
+│  │  ├─ orchestrator.py         # RAG engine orchestrator with metrics & service health
+│  │  ├─ embeddings.py           # Local embedding implementation (deterministic hashing)
+│  │  ├─ vector_store.py         # Qdrant + InMemory store with fallback
+│  │  ├─ llm_providers.py        # OpenAI + Stub LLM with deduplication logic
+│  │  ├─ ingest.py               # doc loader & chunker
+│  │  ├─ utils.py                # Utility functions (retry logic, etc.)
+│  │  ├─ rag.py                  # Backward compatibility wrapper
+│  │  ├─ models.py               # pydantic models
 │  │  ├─ __init__.py
 │  │  └─ tests/
 │  │     ├─ conftest.py
-│  │     └─ test_api.py
+│  │     ├─ test_api.py           # API endpoint tests
+│  │     ├─ test_acceptance.py    # Acceptance criteria tests
+│  │     └─ test_end_to_end.py   # End-to-end integration tests
 │  ├─ requirements.txt
 │  └─ Dockerfile
 ├─ frontend/
 │  ├─ app/
-│  │  ├─ page.tsx         # chat UI
+│  │  ├─ page.tsx                # chat UI
 │  │  ├─ layout.tsx
 │  │  └─ globals.css
 │  ├─ components/
-│  │  ├─ Chat.tsx
-│  │  └─ AdminPanel.tsx
-│  ├─ lib/api.ts
+│  │  ├─ Chat.tsx                # Enhanced chat with deduplication & categorization display
+│  │  └─ AdminPanel.tsx          # Admin panel for ingestion & metrics
+│  ├─ lib/api.ts                 # API client
 │  ├─ package.json
 │  ├─ tsconfig.json
 │  ├─ next.config.js
+│  ├─ next-env.d.ts              # Next.js type definitions
 │  └─ Dockerfile
-├─ data/                  # sample policy docs
-├─ docker-compose.yml
+├─ data/                         # sample policy docs
+│  ├─ Compliance_Notes.md
+│  ├─ Delivery_and_Shipping.md
+│  ├─ Internal_SOP_Agent_Guide.md
+│  ├─ Product_Catalog.md
+│  ├─ Returns_and_Refunds.md
+│  └─ Warranty_Policy.md
+├─ docs/                         # Additional documentation
+│  ├─ DEVELOPER_GUIDE.md         # Developer setup guide
+│  ├─ DEPLOYMENT.md              # Production deployment guide
+│  └─ API_PLAYGROUND.md          # Interactive API testing
+├─ docker-compose.yml            # Removed obsolete version attribute
 ├─ Makefile
-└─ .env.example
+├─ .env.example
+└── .gitignore                    # Proper gitignore for security
 ```
 
 ## Tests

@@ -13,6 +13,25 @@ const MessageItem = React.memo(({ message, index }: MessageItemProps) => {
   const citationsArray = React.useMemo(() => message.citations || [], [message.citations]);
   const chunksArray = React.useMemo(() => message.chunks || [], [message.chunks]);
 
+  // Group citations and chunks by source title to avoid duplicate badges
+  const uniqueCitationTitles = React.useMemo(() => {
+    const titles = new Set<string>();
+    for (const c of citationsArray) {
+      if (c.title) titles.add(c.title);
+    }
+    return Array.from(titles);
+  }, [citationsArray]);
+
+  const chunksGroupedByTitle = React.useMemo(() => {
+    const byTitle = new Map<string, typeof chunksArray>();
+    for (const chunk of chunksArray) {
+      const list = byTitle.get(chunk.title) || [];
+      list.push(chunk);
+      byTitle.set(chunk.title, list);
+    }
+    return byTitle;
+  }, [chunksArray]);
+
   return (
     <div key={index} className={styles.messageContainer}>
       <div className={styles.messageHeader}>
@@ -32,16 +51,16 @@ const MessageItem = React.memo(({ message, index }: MessageItemProps) => {
       {citationsArray.length > 0 && (
         <div className={styles.citationsContainer}>
           <div className={styles.citationsHeader}>
-            📚 Sources ({citationsArray.length})
+            📚 Sources ({uniqueCitationTitles.length})
           </div>
           <div className={styles.citationsList}>
-            {citationsArray.map((c, idx) => (
+            {uniqueCitationTitles.map((title) => (
               <span
-                key={`${c.title}-${c.section}-${idx}`}
+                key={title}
                 className="badge"
-                title={c.section ? `${c.title} - ${c.section}` : c.title}
+                title={title}
               >
-                📄 {c.title}
+                📄 {title}
               </span>
             ))}
           </div>
@@ -52,23 +71,28 @@ const MessageItem = React.memo(({ message, index }: MessageItemProps) => {
         <div className={styles.chunksContainer}>
           <details className={styles.chunkDetails}>
             <summary className={styles.chunkSummary}>
-              🔍 View supporting sources ({chunksArray.length} chunks)
+              🔍 View supporting sources ({chunksGroupedByTitle.size} files, {chunksArray.length} chunks)
             </summary>
             <div className={styles.chunkContent}>
-              {chunksArray.map((c, idx) => (
-                <div key={`${c.title}-${c.section}-${idx}`} className={idx < chunksArray.length - 1 ? styles.chunkItem : `${styles.chunkItem} ${styles.chunkItemLastChild}`}>
-                  <div className={styles.chunkTitle}>
-                    📋 {c.title}
-                    {c.section && (
-                      <span className={styles.chunkSection}>
-                        → {c.section}
-                      </span>
-                    )}
-                  </div>
-                  <div className={styles.chunkText}>
-                    {c.text}
-                  </div>
-                </div>
+              {Array.from(chunksGroupedByTitle.entries()).map(([title, groupChunks], groupIdx) => (
+                <details key={`${title}-${groupIdx}`} className={styles.chunkItem}>
+                  <summary className={styles.chunkTitle}>
+                    📋 {title}
+                    <span className={styles.chunkSection}> ({groupChunks.length} section{groupChunks.length > 1 ? 's' : ''})</span>
+                  </summary>
+                  {groupChunks.map((c, idx) => (
+                    <div key={`${c.title}-${c.section}-${idx}`} className={idx < groupChunks.length - 1 ? styles.chunkItem : `${styles.chunkItem} ${styles.chunkItemLastChild}`}>
+                      {c.section && (
+                        <div className={styles.chunkSection}>
+                          → {c.section}
+                        </div>
+                      )}
+                      <div className={styles.chunkText}>
+                        {c.text}
+                      </div>
+                    </div>
+                  ))}
+                </details>
               ))}
             </div>
           </details>

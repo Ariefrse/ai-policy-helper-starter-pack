@@ -1,3 +1,7 @@
+<video src="ai-policy-helper-demo-title.mp4 00-22-45-769.mp4" controls width="600">
+  
+</video>
+
 # AI Policy & Product Helper
 
 A local-first RAG starter with **FastAPI** (backend), **Next.js** (frontend), and **Qdrant** (vector DB). Runs with one command using Docker Compose.
